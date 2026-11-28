@@ -9,6 +9,7 @@ import datetime
 import json
 from pathlib import Path
 import re
+import xml.etree.ElementTree as ET
 
 DEVEL = 'app.kyllene.Kyllene.Devel'
 STABLE = 'app.kyllene.Kyllene'
@@ -39,15 +40,15 @@ def stable_files(directory, version, date):
     """The stable app's .desktop file and metainfo, from the Devel ones: its own ID and name, and this release."""
     desktop = (directory / (DEVEL + '.desktop')).read_text()
     desktop = desktop.replace(DEVEL, STABLE)
-    # The name, in English and in every translation beside it: the release is not the development build.
-    desktop = re.sub(r'^Name(\[[^\]]*\])?=Kyllene \((?:Development|Entwicklung)\)$',
-                     lambda m: 'Name' + (m.group(1) or '') + '=Kyllene', desktop, flags=re.M)
-    (directory / (STABLE + '.desktop')).write_text(desktop)
+    prefix, header, groups = desktop.partition('[Desktop Entry]\n')
+    if not header:
+        raise ValueError('Expected a [Desktop Entry] group')
+    entry, next_group, actions = groups.partition('\n[')
+    # Action groups also use Name keys. Only the main app title changes in a release.
+    entry = re.sub(r'^(Name(?:\[[^\]\n]+\])?)[ \t]*=.*$', r'\1=Kyllene', entry, flags=re.M)
+    desktop = prefix + header + entry + next_group + actions
     metainfo = (directory / (DEVEL + '.metainfo.xml')).read_text()
     metainfo = metainfo.replace(DEVEL, STABLE)
-    metainfo, name_count = re.subn(r'<name>Kyllene \(Development\)</name>', '<name>Kyllene</name>', metainfo)
-    if name_count != 1:
-        raise ValueError('Expected one <name> element in the metainfo')
     # A pre-release (1.2.3-rc.1) is a development release to software centres.
     kind = 'development' if '-' in version else 'stable'
     metainfo, count = re.subn(r'<releases>.*?</releases>',
@@ -55,7 +56,16 @@ def stable_files(directory, version, date):
                               metainfo, flags=re.S)
     if count != 1:
         raise ValueError('Expected one <releases> element in the metainfo')
-    (directory / (STABLE + '.metainfo.xml')).write_text(metainfo)
+    component = ET.fromstring(metainfo)
+    names = component.findall('name')
+    xml_lang = '{http://www.w3.org/XML/1998/namespace}lang'
+    if sum(xml_lang not in name.attrib for name in names) != 1:
+        raise ValueError('Expected one default <name> element in the metainfo')
+    for name in names:
+        name.text = 'Kyllene'
+    (directory / (STABLE + '.desktop')).write_text(desktop)
+    (directory / (STABLE + '.metainfo.xml')).write_bytes(
+        ET.tostring(component, encoding='UTF-8', xml_declaration=True) + b'\n')
 
 
 if __name__ == '__main__':

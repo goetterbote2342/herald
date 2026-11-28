@@ -1,9 +1,11 @@
+import configparser
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 FLATPAK = Path(__file__).resolve().parents[1]
 
@@ -96,7 +98,7 @@ class CiSourceTest(unittest.TestCase):
             self.assertIn('<id>app.kyllene.Kyllene</id>', metainfo)
             self.assertIn('<name>Kyllene</name>', metainfo)
             self.assertIn('app.kyllene.Kyllene.desktop</launchable>', metainfo)
-            self.assertRegex(metainfo, r'<release version="1\.2\.3" date="\d{4}-\d\d-\d\d" type="stable"/>')
+            self.assertRegex(metainfo, r'<release version="1\.2\.3" date="\d{4}-\d\d-\d\d" type="stable"\s*/>')
             self.assertNotIn('Devel', desktop + metainfo)
 
     def test_a_pre_release_suffix_is_kept(self):
@@ -110,19 +112,25 @@ class CiSourceTest(unittest.TestCase):
             self.assertIn('type="development"', metainfo)
 
     def test_a_release_drops_the_development_word_from_every_translation(self):
-        """The release is not the development build in any language, so no Name[xx] may keep it."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.assertEqual(prepare(devel_files(root), 'flatpak-release', '--release', '1.2.3').returncode, 0)
-            desktop = (root / 'app.kyllene.Kyllene.desktop').read_text()
-            names = [line for line in desktop.splitlines() if line.startswith('Name')]
-            self.assertIn('Name=Kyllene', names)
-            self.assertTrue(len(names) > 1, 'the .desktop file carries no translated name')
-            for line in names:
-                self.assertNotIn('Development', line)
-                self.assertNotIn('Entwicklung', line)
-            metainfo = (root / 'app.kyllene.Kyllene.metainfo.xml').read_text()
-            self.assertNotIn('Development', metainfo)
+            manifest = devel_files(root)
+            desktop = root / 'app.kyllene.Kyllene.Devel.desktop'
+            desktop.write_text(desktop.read_text().replace('[Desktop Entry]\n',
+                '[Desktop Entry]\nName[ja]=Kyllene（開発版）\n'))
+            metainfo = root / 'app.kyllene.Kyllene.Devel.metainfo.xml'
+            metainfo.write_text(metainfo.read_text().replace('</name>',
+                '</name>\n  <name xml:lang="ja">Kyllene（開発版）</name>', 1))
+
+            result = prepare(manifest, 'flatpak-release', '--release', '1.2.3')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            entry = configparser.ConfigParser(interpolation=None)
+            entry.read(root / 'app.kyllene.Kyllene.desktop', encoding='utf-8')
+            self.assertEqual(entry['Desktop Entry']['Name[ja]'], 'Kyllene')
+            self.assertEqual(entry['Desktop Action NewChat']['Name[de]'], 'Neuer Chat')
+            component = ET.parse(root / 'app.kyllene.Kyllene.metainfo.xml').getroot()
+            self.assertEqual(component.findtext('name[@xml:lang="ja"]', namespaces={
+                'xml': 'http://www.w3.org/XML/1998/namespace'}), 'Kyllene')
 
     def test_the_devel_files_carry_german_beside_the_english_words(self):
         desktop = (FLATPAK / 'app.kyllene.Kyllene.Devel.desktop').read_text()
