@@ -9,7 +9,7 @@ ENTRY = Path(__file__).resolve().parents[1] / 'app.kyllene.Kyllene.Devel.desktop
 class DesktopActionsTest(unittest.TestCase):
     def setUp(self):
         self.entry = configparser.ConfigParser(interpolation=None)
-        self.entry.read(ENTRY)
+        self.entry.read(ENTRY, encoding='utf-8')
 
     def test_primary_launcher_forwards_one_uri_without_claiming_the_hermes_scheme(self):
         main = self.entry['Desktop Entry']
@@ -28,14 +28,14 @@ class DesktopActionsTest(unittest.TestCase):
             self.assertEqual(group['Name'], name)
             self.assertEqual(shlex.split(group['Exec']), ['kyllene', uri])
 
-    def test_every_name_and_comment_has_a_german_line(self):
-        """A software centre and the start menu show the language of the desktop, not the .desktop file's."""
-        for section in ('Desktop Entry', 'Desktop Action NewChat', 'Desktop Action QuickEntry', 'Desktop Action Call'):
-            group = self.entry[section]
-            with self.subTest(section):
-                self.assertTrue(group.get('Name[de]'), section + ' has no German name')
-                self.assertNotEqual(group['Name[de]'], group['Name'], section + ' repeats the English name')
-        self.assertTrue(self.entry['Desktop Entry'].get('Comment[de]'))
+    def test_every_shipped_locale_has_launcher_labels(self):
+        for locale in ('de', 'fr', 'es', 'pt_BR', 'zh_CN', 'hu'):
+            for section in self.entry.sections():
+                group = self.entry[section]
+                for key in ('Name', 'Comment') if section == 'Desktop Entry' else ('Name',):
+                    with self.subTest(locale=locale, section=section, key=key):
+                        self.assertTrue(group.get(f'{key}[{locale}]'))
+                        self.assertNotEqual(group[f'{key}[{locale}]'], group[key])
 
 
 if __name__ == '__main__':

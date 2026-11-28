@@ -132,14 +132,34 @@ class CiSourceTest(unittest.TestCase):
             self.assertEqual(component.findtext('name[@xml:lang="ja"]', namespaces={
                 'xml': 'http://www.w3.org/XML/1998/namespace'}), 'Kyllene')
 
-    def test_the_devel_files_carry_german_beside_the_english_words(self):
-        desktop = (FLATPAK / 'app.kyllene.Kyllene.Devel.desktop').read_text()
-        self.assertIn('Name[de]=Kyllene (Entwicklung)', desktop)
-        self.assertIn('Name[de]=Neuer Chat', desktop)
-        self.assertIn('Comment[de]=', desktop)
-        metainfo = (FLATPAK / 'app.kyllene.Kyllene.Devel.metainfo.xml').read_text()
-        self.assertIn('<summary xml:lang="de">', metainfo)
-        self.assertIn('<p xml:lang="de">', metainfo)
+    def test_release_keeps_translated_packaging_copy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = devel_files(root)
+            result = prepare(manifest, 'flatpak-release', '--release', '1.2.3')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            devel, stable = (configparser.ConfigParser(interpolation=None) for _ in range(2))
+            devel.read(root / 'app.kyllene.Kyllene.Devel.desktop', encoding='utf-8')
+            stable.read(root / 'app.kyllene.Kyllene.desktop', encoding='utf-8')
+            components = [ET.parse(root / (app + '.metainfo.xml')).getroot() for app in
+                          ('app.kyllene.Kyllene.Devel', 'app.kyllene.Kyllene')]
+            ns = {'xml': 'http://www.w3.org/XML/1998/namespace'}
+            for locale in ('de', 'fr', 'es', 'pt-BR', 'zh-CN', 'hu'):
+                with self.subTest(locale=locale):
+                    suffix = '[' + locale.replace('-', '_') + ']'
+                    self.assertEqual(stable['Desktop Entry']['Name' + suffix], 'Kyllene')
+                    for group in devel.sections():
+                        key = 'Comment' if group == 'Desktop Entry' else 'Name'
+                        self.assertEqual(stable[group][key + suffix], devel[group][key + suffix])
+                    name, summary, paragraph = (f'{tag}[@xml:lang="{locale}"]'
+                                                for tag in ('name', 'summary', 'description/p'))
+                    self.assertEqual(components[0].findtext(name, namespaces=ns),
+                                     devel['Desktop Entry']['Name' + suffix])
+                    self.assertEqual(components[1].findtext(name, namespaces=ns), 'Kyllene')
+                    for field in (summary, paragraph):
+                        localized = components[0].findtext(field, namespaces=ns)
+                        self.assertTrue(localized)
+                        self.assertEqual(components[1].findtext(field, namespaces=ns), localized)
 
     def test_a_release_version_is_one_plain_word(self):
         for version in ('1.2', 'v1.2.3', '1.2.3; rm -rf /', '1.2.3 -PreleasesRepo=x', '1.2.3-$(id)'):

@@ -2,8 +2,18 @@
 Type=Application
 Name=Kyllene (Development)
 Name[de]=Kyllene (Entwicklung)
+Name[fr]=Kyllene (développement)
+Name[es]=Kyllene (desarrollo)
+Name[pt_BR]=Kyllene (desenvolvimento)
+Name[zh_CN]=Kyllene（开发版）
+Name[hu]=Kyllene (fejlesztői verzió)
 Comment=Client for Hermes Agent
 Comment[de]=Client für Hermes Agent
+Comment[fr]=Client pour Hermes Agent
+Comment[es]=Cliente para Hermes Agent
+Comment[pt_BR]=Cliente para o Hermes Agent
+Comment[zh_CN]=Hermes Agent 客户端
+Comment[hu]=Kliens a Hermes Agenthez
 Exec=kyllene %u
 Icon=app.kyllene.Kyllene.Devel
 Terminal=false
@@ -14,14 +24,29 @@ Actions=NewChat;QuickEntry;Call;
 [Desktop Action NewChat]
 Name=New chat
 Name[de]=Neuer Chat
+Name[fr]=Nouvelle conversation
+Name[es]=Nuevo chat
+Name[pt_BR]=Nova conversa
+Name[zh_CN]=新对话
+Name[hu]=Új csevegés
 Exec=kyllene herald://new-chat
 
 [Desktop Action QuickEntry]
 Name=Quick entry
 Name[de]=Schnelleingabe
+Name[fr]=Saisie rapide
+Name[es]=Entrada rápida
+Name[pt_BR]=Entrada rápida
+Name[zh_CN]=快速输入
+Name[hu]=Gyorsbevitel
 Exec=kyllene herald://quick-entry
 
 [Desktop Action Call]
 Name=Call Hermes
 Name[de]=Hermes anrufen
+Name[fr]=Appeler Hermes
+Name[es]=Llamar a Hermes
+Name[pt_BR]=Ligar para Hermes
+Name[zh_CN]=呼叫 Hermes
+Name[hu]=Hermes hívása
 Exec=kyllene herald://voice-chat
