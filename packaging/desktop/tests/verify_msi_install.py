@@ -39,13 +39,19 @@ def registry_description(product):
     key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall' + '\\' + product
     for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         try:
-            return winreg.OpenKey(hive, key, 0, winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE)
+            return winreg.OpenKey(hive, key, 0, winreg.KEY_QUERY_VALUE)
         except FileNotFoundError:
             pass
     raise LookupError(f'Fixture not registered: {product}')
 
 
-def verify_installed(package, product, expected):
+def installer_log(path):
+    data = path.read_bytes()
+    encoding = 'utf-16' if data.startswith(b'\xff\xfe') else 'mbcs'
+    return data.decode(encoding, errors='replace')
+
+
+def verify_installed(package, product, expected, action):
     import winreg
 
     installed = False
@@ -57,21 +63,19 @@ def verify_installed(package, product, expected):
         with registry_description(product) as key:
             actual = winreg.QueryValueEx(key, 'Comments')[0]
             assert actual == expected, f'Install wrote {actual!r}, expected {expected!r}'
-            # Make sure repair writes the value back, rather than reading an earlier install's value.
-            winreg.SetValueEx(key, 'Comments', 0, winreg.REG_SZ, 'Before repair')
         run('msiexec', '/i', package, 'REINSTALL=ALL', 'REINSTALLMODE=amus',
             '/qn', '/norestart', '/l*v', repair_log)
         with registry_description(product) as key:
             actual = winreg.QueryValueEx(key, 'Comments')[0]
-            assert actual == expected, f'Repair wrote {actual!r}, expected {expected!r}'
+            assert actual == expected, f'Repair left {actual!r}, expected {expected!r}'
+        # Some repairs keep the existing registration. Check that the action also ran in this transaction.
+        assert f'Doing action: {action}' in installer_log(repair_log), f'Repair skipped {action}'
     except (AssertionError, LookupError, OSError, subprocess.SubprocessError):
         for log in (install_log, repair_log):
             if log.exists():
-                data = log.read_bytes()
-                encoding = 'utf-16' if data.startswith(b'\xff\xfe') else 'mbcs'
-                lines = data.decode(encoding, errors='replace').splitlines()
-                relevant = [line for line in lines if any(key in line for key in
-                            ('UserLanguageID', 'ARPCOMMENTS', 'KylleneDescription', 'Return value 3'))]
+                relevant = [line for line in installer_log(log).splitlines() if any(key in line for key in
+                            ('UserLanguageID', 'ARPCOMMENTS', 'Doing action: KylleneDescription_',
+                             'RegisterProduct', 'Return value 3'))]
                 print(log.name, *relevant[-30:], sep='\n', flush=True)
         raise
     finally:
@@ -94,10 +98,10 @@ def main():
             with functions['database'](ctypes.WinDLL('msi'), package, 0) as db:
                 (product,), = db.execute("SELECT `Value` FROM `Property` WHERE `Property` = 'ProductCode'",
                                          columns=(str,))
-            for culture, langid, expected in (
-                ('de-DE', 1031, 'Ein Desktop-Client für Hermes Agent.'),
-                ('zh-CN', 2052, 'Hermes Agent 的桌面客户端。'),
-                ('en-US', 1033, 'A desktop client for Hermes Agent.'),
+            for culture, langid, action, expected in (
+                ('de-DE', 1031, 'KylleneDescription_de_', 'Ein Desktop-Client für Hermes Agent.'),
+                ('zh-CN', 2052, 'KylleneDescription_zh_CN_', 'Hermes Agent 的桌面客户端。'),
+                ('en-US', 1033, 'JpSetARPCOMMENTS', 'A desktop client for Hermes Agent.'),
             ):
                 set_culture(culture)
                 actual_langid = int(subprocess.check_output([
@@ -105,7 +109,7 @@ def main():
                 ]))
                 assert actual_langid == langid, f'{culture} selected Windows language ID {actual_langid}, expected {langid}'
                 print(f'Testing native MSI install and repair with {culture}', flush=True)
-                verify_installed(package, product, expected)
+                verify_installed(package, product, expected, action)
     finally:
         set_culture(original)
 
