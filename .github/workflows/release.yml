@@ -229,6 +229,15 @@ jobs:
           :desktopApp:${{ matrix.task }} ${{ env.NOTARIZE && ':desktopApp:notarizeReleaseDmg' || '' }}
           -PappVersion="${GITHUB_REF_NAME#v}" -PreleasesRepo="$GITHUB_REPOSITORY"
 
+      - name: Localize the MSI description
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem desktopApp/build/compose/binaries/main-release/msi -Filter *.msi)
+          if ($packages.Count -ne 1) { throw "Expected one Kyllene MSI" }
+          python packaging/desktop/localize-msi-description.py ($packages[0].FullName)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Sign the MSI
         if: runner.os == 'Windows'
         shell: pwsh
@@ -257,7 +266,11 @@ jobs:
           case "${{ runner.os }}" in
             Windows) cp "$out"/msi/*.msi "dist/kyllene-desktop-$v.msi" ;;
             macOS) cp "$out"/dmg/*.dmg "dist/kyllene-desktop-$v.dmg" ;;
-            Linux) cp "$out"/deb/*.deb "dist/kyllene-desktop-${v}_amd64.deb" ;;
+            Linux)
+              dest="dist/kyllene-desktop-${v}_amd64.deb"
+              cp "$out"/deb/*.deb "$dest"
+              python3 packaging/desktop/localize-deb-description.py "$dest"
+              ;;
           esac
           (
             cd dist
