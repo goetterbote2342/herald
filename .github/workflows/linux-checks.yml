@@ -38,7 +38,7 @@ jobs:
       # Without Pillow the installed-smoke tests skip, and no other job runs them.
       - uses: ./.github/actions/apt-install
         with:
-          packages: python3-pil
+          packages: python3-pil dpkg
       - name: Lightweight packaging contracts
         run: |
           # The SDK's fontconfig test remains in the package job; no SDK download on this path.
@@ -48,3 +48,5 @@ jobs:
             [ "$test" = test_fonts.py ] || tests+=("$test")
           done
           python3 -m unittest "${tests[@]}" -v
+      - name: Desktop installer contracts
+        run: python3 -m unittest discover -s packaging/desktop/tests -v

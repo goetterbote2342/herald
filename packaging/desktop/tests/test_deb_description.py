@@ -25,7 +25,7 @@ class DebDescriptionTest(unittest.TestCase):
             (control / 'control').write_text(control_text)
             launcher = source / LAUNCHER
             launcher.parent.mkdir(parents=True)
-            launcher.write_text('[Desktop Entry]\nName=Kyllene\nComment=English\nExec=/opt/kyllene/bin/Kyllene\n')
+            launcher.write_text('[Desktop Entry]\nName=Kyllene\nComment=English\nExec=/opt/kyllene/bin/Kyllene\nComment[de]=Old German comment')
             (control / 'md5sums').write_text('00000000000000000000000000000000  ' + LAUNCHER + '\n')
             package = root / 'kyllene.deb'
             run('dpkg-deb', '--build', '--root-owner-group', source, package)

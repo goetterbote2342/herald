@@ -10,6 +10,7 @@ on:
       - "shared/**"
       - "desktopApp/**"
       - "packaging/flatpak/**"
+      - "packaging/desktop/**"
       - "gradle/**"
       # Offline Gradle configures every project, the Android ones too.
       - "**/*.gradle.kts"

@@ -11,6 +11,8 @@ from tempfile import TemporaryDirectory
 from product_descriptions import descriptions
 
 SEQUENCE = 'InstallExecuteSequence'
+INSTALL_OR_REPAIR = 'NOT (REMOVE~="ALL")'
+FALLBACK_ACTION = 'JpSetARPCOMMENTS'
 
 
 def localized_actions():
@@ -24,7 +26,7 @@ def localized_actions():
         # A single Windows Installer condition can contain at most 255 characters.
         for offset in range(0, len(languages), 8):
             selected = ' OR '.join(f'UserLanguageID={lcid}' for lcid in languages[offset:offset + 8])
-            yield f'KylleneDescription_{locale}_{offset // 8}', f'NOT Installed AND ({selected})', description
+            yield f'KylleneDescription_{locale}_{offset // 8}', f'{INSTALL_OR_REPAIR} AND ({selected})', description
 
 
 def checked(result):
@@ -90,19 +92,24 @@ def localize(path):
         directory = Path(scratch)
         working = directory / path.name
         shutil.copyfile(path, working)
+        fallback = descriptions()['en']
         actions = list(localized_actions())
         with database(msi, working, 1) as db:  # Transacted write.
             sequence = dict(db.execute(f'SELECT `Action`, `Sequence` FROM `{SEQUENCE}`', columns=(str, int)))
-            # Set the localized value after jpackage's fallback and before Windows records it.
+            # REMOVE may only be resolved at InstallValidate. Set the fallback and translation
+            # after that point and before Windows registers the product description.
             occupied = set(sequence.values())
-            slots = [slot for slot in range(sequence['RegisterProduct'] - 1, sequence['JpSetARPCOMMENTS'], -1)
-                     if slot not in occupied][:len(actions)]
-            if len(slots) != len(actions):
+            slots = [slot for slot in range(sequence['RegisterProduct'] - 1, sequence['InstallValidate'], -1)
+                     if slot not in occupied][:len(actions) + 1]
+            if len(slots) != len(actions) + 1:
                 raise ValueError('No sequence slots for localized product descriptions')
             # One MSI needs to hold both accented Latin text and Simplified Chinese.
             codepage = directory / '_ForceCodepage.idt'
             codepage.write_bytes(b'\r\n\r\n65001\t_ForceCodepage\r\n')
             checked(msi.MsiDatabaseImportW(db.handle, C.c_wchar_p(scratch), C.c_wchar_p(codepage.name)))
+            db.execute('UPDATE `CustomAction` SET `Target` = ? WHERE `Action` = ?', (fallback, FALLBACK_ACTION))
+            db.execute(f'UPDATE `{SEQUENCE}` SET `Condition` = ?, `Sequence` = ? WHERE `Action` = ?',
+                       (INSTALL_OR_REPAIR, slots.pop(), FALLBACK_ACTION))
             for (name, condition, value), slot in zip(actions, slots):
                 db.execute('INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) VALUES (?, ?, ?, ?)',
                            (name, 51, 'ARPCOMMENTS', value))
@@ -110,7 +117,7 @@ def localize(path):
                            (name, condition, slot))
             checked(msi.MsiDatabaseCommit(db.handle))
         with database(msi, working, 0) as db:
-            for name, _, value in actions:
+            for name, _, value in [(FALLBACK_ACTION, INSTALL_OR_REPAIR, fallback), *actions]:
                 if db.execute('SELECT `Target` FROM `CustomAction` WHERE `Action` = ?', (name,),
                               columns=(str,)) != [(value,)]:
                     raise ValueError(f'MSI lost the product description for {name}')

@@ -17,7 +17,8 @@ class MsiDescriptionTest(unittest.TestCase):
         values = {}
         for _, condition, text in localized_actions():
             self.assertLessEqual(len(condition), 255)
-            self.assertTrue(condition.startswith('NOT Installed AND'))
+            self.assertNotIn('Installed', condition)
+            self.assertTrue(condition.startswith('NOT (REMOVE~="ALL") AND'))
             for lcid in map(int, re.findall(r'UserLanguageID=(\d+)', condition)):
                 self.assertNotIn(lcid, values)
                 values[lcid] = text

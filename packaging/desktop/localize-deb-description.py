@@ -14,7 +14,6 @@ LAUNCHER = Path('opt/kyllene/lib/kyllene-Kyllene.desktop')
 def launcher_comments():
     for locale, value in descriptions().items():
         key = f'Comment[{locale}]' if locale != 'en' else 'Comment'
-        value = value.replace('\\', '\\\\')
         yield f'{key}={value}'
 
 
@@ -28,7 +27,7 @@ def localize(package):
         if not header.startswith('[Desktop Entry]\n'):
             raise ValueError('Expected the jpackage desktop entry')
         header, count = re.subn(r'^Comment=.*$', lambda _: '\n'.join(launcher_comments()),
-                                re.sub(r'^Comment\[[^\]\n]+\]=[^\n]*\n', '', header, flags=re.M), flags=re.M)
+                                re.sub(r'^Comment\[[^\]\n]+\]=[^\n]*(?:\n|$)', '', header, flags=re.M), flags=re.M)
         if count != 1:
             raise ValueError('Expected one default launcher comment')
         launcher.write_text(header + separator + actions, encoding='utf-8')

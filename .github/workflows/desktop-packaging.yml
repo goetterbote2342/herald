@@ -1,0 +1,29 @@
+name: Desktop packaging
+on:
+  pull_request:
+    paths:
+      - "packaging/desktop/**"
+      - "shared/ui/src/commonMain/composeResources/**/strings.xml"
+      - ".github/workflows/desktop-packaging.yml"
+      - ".github/workflows/release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-msi:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: jetbrains
+          java-version: "25"
+      - name: Verify localized install and repair
+        shell: pwsh
+        run: |
+          if ($env:WIX) { $env:Path = "$env:WIX\bin;$env:Path" }
+          python -B packaging/desktop/tests/verify_msi_install.py
