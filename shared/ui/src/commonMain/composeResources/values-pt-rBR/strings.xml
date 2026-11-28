@@ -38,6 +38,7 @@
     <string name="settings_section_privacy">Privacidade</string>
     <string name="settings_section_account">Conta</string>
     <string name="settings_section_about">Sobre</string>
+    <string name="desktop_product_description">Um cliente de desktop para o Hermes Agent.</string>
     <string name="settings_theme">Tema</string>
     <string name="settings_theme_system">Sistema</string>
     <string name="settings_theme_light">Claro</string>

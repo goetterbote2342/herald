@@ -1011,6 +1011,18 @@ internal fun SettingsView(
                 }
 
                 Section(stringResource(Res.string.settings_section_about)) {
+                    if (isDesktop) {
+                        val description = stringResource(Res.string.desktop_product_description)
+                        if (settingShown(description)) {
+                            Text(
+                                description,
+                                modifier = Modifier.padding(14.dp),
+                                style = Theme[typography][body],
+                                color = Theme[colors][textSecondary],
+                            )
+                            Divider()
+                        }
+                    }
                     InfoRow(stringResource(Res.string.settings_app_version), LocalAppVersion.current ?: stringResource(Res.string.common_unknown))
                     Divider()
                     SwitchRow(

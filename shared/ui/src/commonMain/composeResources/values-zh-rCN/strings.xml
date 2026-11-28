@@ -38,6 +38,7 @@
     <string name="settings_section_privacy">隐私</string>
     <string name="settings_section_account">账户</string>
     <string name="settings_section_about">关于</string>
+    <string name="desktop_product_description">Hermes Agent 的桌面客户端。</string>
     <string name="settings_theme">主题</string>
     <string name="settings_theme_system">跟随系统</string>
     <string name="settings_theme_light">浅色</string>
